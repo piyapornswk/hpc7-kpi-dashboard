@@ -309,7 +309,7 @@
 
     // ── โหลดข้อมูล ──
     function loadYears(selectYear){
-      return fetch('data/years.json').then(function(r){return r.json();}).then(function(years){
+      return fetch('data/years.json?v='+Date.now()).then(function(r){return r.json();}).then(function(years){
         sy.innerHTML='';
         years.forEach(function(y){ var o=document.createElement('option'); o.value=y; o.textContent=y; sy.appendChild(o); });
         currentYear = selectYear && years.indexOf(selectYear)>=0 ? selectYear : (years[0]||null);
@@ -318,7 +318,7 @@
       });
     }
     function loadData(keepGroup){
-      return fetch('data/kpi-'+currentYear+'.json').then(function(r){return r.json();}).then(function(res){
+      return fetch('data/kpi-'+currentYear+'.json?v='+Date.now()).then(function(r){return r.json();}).then(function(res){
         GROUPS=res.groups; DATA=res.indicators;
         gMap={}; GROUPS.forEach(function(g){gMap[g.id]=g;});
         // เติม dropdown กลุ่มงาน
@@ -807,7 +807,7 @@
       img.src='logo.png';
     })();
     // วันที่ข้อมูลล่าสุด (จากไฟล์ที่อัปเดตตอนเผยแพร่)
-    fetch('data/meta.json').then(function(r){return r.json();}).then(function(m){
+    fetch('data/meta.json?v='+Date.now()).then(function(r){return r.json();}).then(function(m){
       if(m&&m.updated){ var e=document.getElementById('upd-date'); if(e) e.textContent=' · ข้อมูล ณ '+m.updated; }
     }).catch(function(){});
   </script>
