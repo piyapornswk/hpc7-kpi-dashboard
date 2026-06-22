@@ -172,14 +172,6 @@
   </header>
 
   <main>
-    <nav class="crumbs anim">
-      <span>หน้าหลัก</span>
-      <i data-lucide="chevron-right"></i>
-      <span>ตัวชี้วัดสำคัญของศูนย์อนามัยที่ 7 ขอนแก่น</span>
-      <i data-lucide="chevron-right"></i>
-      <span class="here">Dashboard ตัวชี้วัด</span>
-    </nav>
-
     <div class="page-head anim">
       <span class="ph-icon"><i data-lucide="bar-chart-3"></i></span>
       <div class="ph-text">
@@ -226,7 +218,7 @@
     </div>
   </div>
 
-  <footer class="site"><div class="foot-bar-inner">© 2569 กรมอนามัย กระทรวงสาธารณสุข · งานข้อมูลและติดตามประเมินผล<br><span style="opacity:.8">เวอร์ชันเผยแพร่ออนไลน์ (อ่านอย่างเดียว) · ข้อมูล ณ 22 มิ.ย. 2569</span></div></footer>
+  <footer class="site"><div class="foot-bar-inner">© 2569 กรมอนามัย กระทรวงสาธารณสุข · งานข้อมูลและติดตามประเมินผล<br><span style="opacity:.8">เวอร์ชันเผยแพร่ออนไลน์ (อ่านอย่างเดียว)<span id="upd-date"></span></span></div></footer>
 
   <script>
     var ICONS = {
@@ -814,6 +806,10 @@
       img.onload=function(){ w.innerHTML=''; img.style.cssText='width:100%;height:100%;object-fit:cover;'; w.appendChild(img); };
       img.src='logo.png';
     })();
+    // วันที่ข้อมูลล่าสุด (จากไฟล์ที่อัปเดตตอนเผยแพร่)
+    fetch('data/meta.json').then(function(r){return r.json();}).then(function(m){
+      if(m&&m.updated){ var e=document.getElementById('upd-date'); if(e) e.textContent=' · ข้อมูล ณ '+m.updated; }
+    }).catch(function(){});
   </script>
 </body>
 </html>
