@@ -16,15 +16,14 @@ logo.png            โลโก้ศูนย์อนามัยที่ 7
 ซึ่งดึงจาก MOPH opendata HDC API — เวอร์ชันออนไลน์นี้ **ไม่ดึง API สด** และ **แก้ไขไม่ได้**
 (ระบบเต็ม + การแก้ไข/ดึง API อัตโนมัติ ยังอยู่ที่เครื่องภายในเท่านั้น)
 
-## วิธีอัปเดตข้อมูล (เมื่อข้อมูลในระบบหลักเปลี่ยน)
-1. รันระบบหลัก (เปิด `เปิดเว็บงานข้อมูล.bat`) ให้ API ที่ `http://localhost:5080` ทำงาน
-2. ส่งออก JSON ใหม่ทับไฟล์เดิม:
-   ```powershell
-   $r = "<โฟลเดอร์นี้>"
-   irm "http://localhost:5080/api/kpi/years"      -OutFile "$r\data\years.json"
-   irm "http://localhost:5080/api/kpi/data?fy=2569" -OutFile "$r\data\kpi-2569.json"
-   ```
-3. `git add . ; git commit -m "update data" ; git push` → Cloudflare Pages จะ deploy ใหม่อัตโนมัติ
+## วิธีอัปเดตข้อมูล (ปุ่มเดียวจบ)
+1. เปิดระบบหลัก (`เปิดเว็บงานข้อมูล.bat`) แล้ว **ล็อกอิน + แก้ไขข้อมูล** ตามปกติ
+2. ดับเบิลคลิก **`เผยแพร่ Dashboard ออนไลน์.bat`** (อยู่ในโฟลเดอร์โปรเจคหลัก)
+   → ส่งออกข้อมูลล่าสุด + บันทึกวันที่ + `git push` ให้อัตโนมัติ
+3. Cloudflare Pages จะ deploy เว็บออนไลน์ใหม่เองใน ~1 นาที
+
+> เบื้องหลัง: สคริปต์ `publish-dashboard.ps1` ดึง `/api/kpi/*` จาก `localhost:5080`
+> เขียนทับ `data/*.json` + `data/meta.json` (วันที่อัปเดต) แล้ว commit/push
 
 ## Deploy
 โฮสต์เป็น static site บน **Cloudflare Pages** (เชื่อมกับ GitHub repo นี้)
