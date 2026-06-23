@@ -218,7 +218,7 @@
     </div>
   </div>
 
-  <footer class="site"><div class="foot-bar-inner">© 2569 กรมอนามัย กระทรวงสาธารณสุข · งานข้อมูลและติดตามประเมินผล<br><span style="opacity:.8">เวอร์ชันเผยแพร่ออนไลน์ (อ่านอย่างเดียว)<span id="upd-date"></span></span></div></footer>
+  <footer class="site"><div class="foot-bar-inner">© 2569 กรมอนามัย กระทรวงสาธารณสุข · งานข้อมูลและติดตามประเมินผล<br><span style="opacity:.8"><span id="upd-date"></span></span></div></footer>
 
   <script>
     var ICONS = {
@@ -808,7 +808,7 @@
     })();
     // วันที่ข้อมูลล่าสุด (จากไฟล์ที่อัปเดตตอนเผยแพร่)
     fetch('data/meta.json?v='+Date.now()).then(function(r){return r.json();}).then(function(m){
-      if(m&&m.updated){ var e=document.getElementById('upd-date'); if(e) e.textContent=' · ข้อมูล ณ '+m.updated; }
+      if(m&&m.updated){ var e=document.getElementById('upd-date'); if(e) e.textContent='ข้อมูล ณ '+m.updated; }
     }).catch(function(){});
   </script>
 </body>
