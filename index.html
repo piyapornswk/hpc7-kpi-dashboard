@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="th">
 <head>
 <meta charset="UTF-8">
@@ -276,14 +276,32 @@
       var m=(new Date()).getMonth()+1;
       return (m>=5&&m<=11)?'1':'2';
     }
+    function currentQuarterKey(){
+      var m=(new Date()).getMonth()+1;
+      if(m>=10&&m<=12) return '1';
+      if(m>=1&&m<=3) return '2';
+      if(m>=4&&m<=6) return '3';
+      return '4';
+    }
+    function periodLabel(key,tv){
+      return tv&&tv.kind==='quarter' ? ('ไตรมาส '+key) : (key==='1'?'เทอม 1':'เทอม 2');
+    }
     function currentTermInfo(d){
       var tv=termVals(d);
       if(!tv.has) return null;
-      var keys=[currentTermKey(), currentTermKey()==='1'?'2':'1'];
+      var keys;
+      if(tv.kind==='quarter'){
+        var q=currentQuarterKey();
+        keys=[q];
+        for(var qi=parseInt(q,10)-1;qi>=1;qi--) keys.push(String(qi));
+        for(var qj=parseInt(q,10)+1;qj<=4;qj++) keys.push(String(qj));
+      }else{
+        keys=[currentTermKey(), currentTermKey()==='1'?'2':'1'];
+      }
       for(var i=0;i<keys.length;i++){
-        var vals=keys[i]==='1'?tv.t1:tv.t2;
+        var vals=tv.vals[keys[i]]||{};
         for(var j=0;j<PROVINCES.length;j++){
-          if(vals[PROVINCES[j].id]!=null) return {key:keys[i], label:keys[i]==='1'?'เทอม 1':'เทอม 2'};
+          if(vals[PROVINCES[j].id]!=null) return {key:keys[i], label:periodLabel(keys[i],tv)};
         }
       }
       return null;
@@ -486,7 +504,31 @@
 
       var tvd=termVals(d);
       var evalInfo=currentTermInfo(d);
-      if(tvd.has){
+      if(tvd.has&&tvd.kind==='quarter'){
+        html+='<div class="tbl-wrap"><table style="min-width:760px">'+
+          '<thead><tr>'+
+            '<th class="name-col">จังหวัด</th>'+
+            '<th class="grp">ไตรมาส 1</th>'+
+            '<th style="background:#E8F1FB;color:#1A73C8">ไตรมาส 2</th>'+
+            '<th style="background:#F2EAE0;color:#9A631F">ไตรมาส 3</th>'+
+            '<th style="background:#EFEAF6;color:#6B4FA0">ไตรมาส 4</th>'+
+            '<th>ระดับ (จาก'+(evalInfo?evalInfo.label:'ไตรมาสปัจจุบัน')+')</th>'+
+          '</tr></thead><tbody>';
+        cols.forEach(function(p){
+          var v=provVal(d,p.id);
+          var pp=provPass(d,v);
+          var lvlCell=pp==null?'<span style="color:var(--ink-muted)">—</span>':'<span class="lvl '+(pp?'ok':'bad')+'">'+(pp?'ผ่านเกณฑ์':'ไม่ผ่านเกณฑ์')+'</span>';
+          function cell(x,col){ return x==null?'<span style="color:var(--ink-muted)">—</span>':'<b style="font-family:IBM Plex Sans,sans-serif;font-size:15px;color:'+col+'">'+fmt(x)+'</b> <small style="color:var(--ink-muted)">'+esc(d.unit)+'</small>'; }
+          html+='<tr>'+
+            '<td class="name-col" style="font-weight:'+(p.isZone||p.isNation?'700':'500')+'">'+p.name+(p.isZone?' (เขตสุขภาพที่ 7)':'')+'</td>'+
+            '<td style="text-align:center">'+cell(tvd.t1[p.id],'#52B97A')+'</td>'+
+            '<td style="text-align:center">'+cell(tvd.t2[p.id],'#1A73C8')+'</td>'+
+            '<td style="text-align:center">'+cell(tvd.t3[p.id],'#B5791F')+'</td>'+
+            '<td style="text-align:center">'+cell(tvd.t4[p.id],'#6B4FA0')+'</td>'+
+            '<td>'+lvlCell+'</td>'+
+          '</tr>';
+        });
+      } else if(tvd.has){
         // ตารางแยกรายเทอม (เทอม 2 = ค่าหลักที่ใช้ตัดสิน)
         html+='<div class="tbl-wrap"><table style="min-width:560px">'+
           '<thead><tr>'+
@@ -570,10 +612,15 @@
 
     // ── ข้อมูลรายเทอม (เทอม 1 = พ.ค.–ก.ค. · เทอม 2 = ธ.ค.–ก.พ.) ──
     function termVals(d){
-      var t=d.terms||{}; var t1=t['1']||{}, t2=t['2']||{};
+      var t=d.terms||{}; var t1=t['1']||{}, t2=t['2']||{}, t3=t['3']||{}, t4=t['4']||{};
+      var field=(d.syncField||'').toString();
+      var isQuarterFormula=field.split('|').length>=4 || /_q3|_q4|q3|q4/i.test(field);
+      var kind=(Object.prototype.hasOwnProperty.call(t,'3')||Object.prototype.hasOwnProperty.call(t,'4')||isQuarterFormula)?'quarter':'term';
+      var keys=kind==='quarter'?['1','2','3','4']:['1','2'];
+      var vals={'1':t1,'2':t2,'3':t3,'4':t4};
       var has=false;
-      PROVINCES.forEach(function(p){ if(t1[p.id]!=null||t2[p.id]!=null) has=true; });
-      return {t1:t1, t2:t2, has:has};
+      PROVINCES.forEach(function(p){ keys.forEach(function(k){ if(vals[k][p.id]!=null) has=true; }); });
+      return {t1:t1, t2:t2, t3:t3, t4:t4, vals:vals, keys:keys, kind:kind, has:has};
     }
 
     // ── หมายเหตุตัวชี้วัด real-time (ผูก HDC API · ดึงอัตโนมัติทุก 1 ชม.) ──
@@ -599,7 +646,7 @@
       var ht=hasTarget(d);
       var tv=termVals(d);
       var allVals=pValues.slice();
-      if(tv.has) cols.forEach(function(p){ if(tv.t1[p.id]!=null) allVals.push(tv.t1[p.id]); if(tv.t2[p.id]!=null) allVals.push(tv.t2[p.id]); });
+      if(tv.has) cols.forEach(function(p){ tv.keys.forEach(function(k){ if(tv.vals[k][p.id]!=null) allVals.push(tv.vals[k][p.id]); }); });
       var maxV=Math.max.apply(null,allVals.concat(ht?[d.target]:[]))*1.2||1;
       var n=cols.length;
       var BAR=104,GAP=34,LPAD=56,RPAD=100,TOP=46,BOT=70,H=420;
@@ -626,6 +673,27 @@
       svg.appendChild(L(LPAD,TOP+plotH,W-RPAD,TOP+plotH,{'stroke':'#D5DED7','stroke-width':'1'}));
       svg.appendChild(T(LPAD,TOP-16,d.name.slice(0,46)+(d.name.length>46?'…':''),{'font-size':'12.5','fill':'#134E32','font-weight':'700'}));
       if(tv.has){
+        if(tv.kind==='quarter'){
+        var qColors=['#52B97A','#7FA8D9','#D8A652','#8D74C7'];
+        var lxq=W-RPAD-390;
+        tv.keys.forEach(function(k,idx){
+          svg.appendChild(R(lxq+idx*92,TOP-28,12,12,qColors[idx],3));
+          svg.appendChild(T(lxq+idx*92+17,TOP-18,'ไตรมาส '+k,{'font-size':'11','fill':'#46544B'}));
+        });
+        cols.forEach(function(p,i){
+          var x=LPAD+i*(BAR+GAP)+GAP/2, y0=TOP+plotH, bw=(BAR-12)/4;
+          tv.keys.forEach(function(k,idx){
+            var v=tv.vals[k][p.id];
+            if(v==null) return;
+            var bH=Math.max(v/maxV*plotH,2);
+            var bx=x+idx*(bw+4);
+            svg.appendChild(R(bx,y0-bH,bw,bH,qColors[idx],4));
+            svg.appendChild(T(bx+bw/2,y0-bH-6,fmt(v),{'text-anchor':'middle','font-size':'9.5','fill':'#46544B','font-weight':'700'}));
+          });
+          var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
+          svg.appendChild(T(x+BAR/2,y0+18,nm,{'text-anchor':'middle','font-size':'12','fill':'#46544B'}));
+        });
+        } else {
         // โหมดแท่งคู่: เทอม 2 (เขียว) + เทอม 1 (ฟ้า) ต่อจังหวัด
         var lx=W-RPAD-260;
         svg.appendChild(R(lx,TOP-28,12,12,'#52B97A',3));
@@ -644,6 +712,7 @@
           var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
           svg.appendChild(T(x+BAR/2,y0+18,nm,{'text-anchor':'middle','font-size':'12','fill':'#46544B'}));
         });
+        }
       } else {
       cols.forEach(function(p,i){
         var v=pValues[i];
