@@ -90,6 +90,10 @@
   tbody td.name-col{text-align:left;color:var(--ink);font-weight:500;line-height:1.4;}
   tbody tr[data-id]{cursor:pointer;}
   tbody tr[data-id]:hover td{background:var(--green-tint-2);}
+  tbody tr.sub-ind-row td{background:#FBFCFB;}
+  tbody tr.sub-ind-row:hover td{background:var(--green-tint-2);}
+  .sub-ind-name{display:flex;align-items:center;gap:8px;padding-left:18px;color:var(--ink-soft);font-weight:500;}
+  .sub-ind-tag{font-size:10.5px;font-weight:700;color:var(--green-700);background:var(--green-tint);border:1px solid #D7E8DC;padding:2px 7px;border-radius:999px;white-space:nowrap;}
   .val-pass{color:var(--green-600);font-family:"IBM Plex Sans",sans-serif;font-weight:600;font-size:13px;background:var(--green-tint-2);}
   .val-fail{color:var(--red-soft);font-family:"IBM Plex Sans",sans-serif;font-weight:600;font-size:13px;background:var(--red-tint);}
   .target-badge{font-size:13px;color:var(--ink-soft);white-space:nowrap;}
@@ -255,7 +259,7 @@
     (function(){
     // ── state (เวอร์ชันออนไลน์: อ่านจากไฟล์ JSON static) ──
     var GROUPS=[], DATA=[], gMap={};
-    var activeGroup=null, currentYear=null, isSuper=false;
+    var activeGroup=null, currentYear=null, isSuper=false, isLoggedIn=false;
 
     var PROVINCES=[
       {id:'nation',name:'ประเทศ',isNation:true},
@@ -320,6 +324,28 @@
     function provPass(d,v){ if(v==null||!hasTarget(d)) return null; var a=d.dir==='≥'?v/d.target*100:d.target/v*100; return a>=100; }
     function fmt(n){ if(n==null) return '—'; return parseFloat(Number(n).toFixed(2)).toString(); }
     function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function isHctIndicator(d){ return !!d && d.syncTable==='s_child_hct'; }
+    function isHctChild(d){ return isHctIndicator(d) && /result1\/target1/i.test(d.syncField||''); }
+    function hctIndicators(){
+      return DATA.filter(isHctIndicator).sort(function(a,b){
+        if(isHctChild(a)!==isHctChild(b)) return isHctChild(a)?1:-1;
+        return (a.id||0)-(b.id||0);
+      });
+    }
+    function hctPrimary(){ return hctIndicators().find(function(x){return !isHctChild(x);})||null; }
+    function primaryIndicator(d){ return isHctIndicator(d) ? (hctPrimary()||d) : d; }
+    function relatedIndicators(d){
+      if(!isLoggedIn) return [];
+      if(!isHctIndicator(d)) return [];
+      var main=primaryIndicator(d);
+      return hctIndicators().filter(function(x){return x.id!==main.id;});
+    }
+    function visibleGroupItems(gid){
+      return DATA.filter(function(d){return d.groupId===gid && !isHctChild(d);});
+    }
+    function shortIndicatorName(d){
+      return isHctChild(d) ? 'ไม่พบรหัส ICD10' : 'ร้อยละโลหิตจาง';
+    }
 
     var sg=document.getElementById('sel-group');
     var si=document.getElementById('sel-indicator');
@@ -342,7 +368,7 @@
         // เติม dropdown กลุ่มงาน
         sg.innerHTML='';
         GROUPS.forEach(function(g){
-          var n=DATA.filter(function(d){return d.groupId===g.id;}).length;
+          var n=visibleGroupItems(g.id).length;
           var o=document.createElement('option'); o.value=g.id; o.textContent=g.label+' ('+n+' ตัวชี้วัด)';
           sg.appendChild(o);
         });
@@ -354,7 +380,7 @@
 
     function fillIndicators(gid){
       si.innerHTML='<option value="">— ตัวแรกของกลุ่ม —</option>';
-      DATA.filter(function(d){return d.groupId===gid;}).forEach(function(d){
+      visibleGroupItems(gid).forEach(function(d){
         var o=document.createElement('option'); o.value=d.id; o.textContent=d.name;
         si.appendChild(o);
       });
@@ -378,7 +404,7 @@
     function renderGroup(gid){
       var rp=document.getElementById('rp-content');
       var g=gMap[gid]; if(!g){rp.innerHTML='';return;}
-      var items=DATA.filter(function(d){return d.groupId===gid;});
+      var items=visibleGroupItems(gid);
       var cols=areasForGroup(gid);
       var pN=items.filter(function(d){return isPass(d)===true;}).length;
       var failN=items.filter(function(d){return isPass(d)===false;}).length;
@@ -429,6 +455,24 @@
           '</span></td>';
         }
         html+='</tr>';
+        relatedIndicators(d).forEach(function(c){
+          html+='<tr data-id="'+d.id+'" class="sub-ind-row">';
+          html+='<td class="name-col"><span class="sub-ind-name"><span class="sub-ind-tag">ข้อมูลประกอบ</span>'+esc(c.name)+(c.syncTable?apiBadge(c):'')+'</span></td>';
+          html+='<td class="target-badge">'+(hasTarget(c)?(c.dir+' '+fmt(c.target)+' <small style="font-size:11px;color:var(--ink-muted)">'+esc(c.unit)+'</small>'):'<small style="color:var(--ink-muted)">ไม่กำหนด</small>')+'</td>';
+          cols.forEach(function(p){
+            var v=provVal(c,p.id);
+            if(v==null){ html+='<td style="color:var(--ink-muted)">—</td>'; return; }
+            var pp=provPass(c,v);
+            if(pp==null){ html+='<td style="font-family:IBM Plex Sans,sans-serif;font-weight:600;color:var(--ink-soft)">'+fmt(v)+'</td>'; return; }
+            html+='<td class="'+(pp?'val-pass':'val-fail')+'">'+fmt(v)+'</td>';
+          });
+          if(isSuper){
+            html+='<td><span class="row-act">'+
+              '<button class="ico-btn act-edit" data-id="'+c.id+'" title="แก้ไข"><i data-lucide="pencil"></i></button>'+
+            '</span></td>';
+          }
+          html+='</tr>';
+        });
       });
       if(!items.length) html+='<tr><td colspan="'+(2+cols.length+(isSuper?1:0))+'" style="text-align:center;padding:30px;color:var(--ink-muted)">ยังไม่มีตัวชี้วัดในกลุ่มนี้'+(isSuper?' — กดปุ่ม "เพิ่มตัวชี้วัด" เพื่อเริ่มต้น':'')+'</td></tr>';
       html+='</tbody></table></div>';
@@ -483,6 +527,8 @@
 
     // ── มุมมองรายตัวชี้วัด ──
     function renderIndicator(d, backGid){
+      d=primaryIndicator(d);
+      var related=relatedIndicators(d);
       var rp=document.getElementById('rp-content');
       var g=gMap[d.groupId];
       var cols=areasForIndicator(d);
@@ -550,6 +596,31 @@
             '<td>'+lvlCell+'</td>'+
           '</tr>';
         });
+      } else if(related.length){
+        var combo=[d].concat(related);
+        html+='<div class="tbl-wrap"><table style="min-width:760px">'+
+          '<thead><tr>'+
+            '<th class="name-col">จังหวัด</th>'+
+            combo.map(function(x,i){
+              return '<th class="'+(i===0?'grp':'')+'" style="'+(i===0?'':'background:#E8F1FB;color:#1A73C8')+'">'+esc(shortIndicatorName(x))+'</th>';
+            }).join('')+
+            '<th>ระดับ</th>'+
+          '</tr></thead><tbody>';
+        cols.forEach(function(p){
+          var mainVal=provVal(d,p.id);
+          var pp=provPass(d,mainVal);
+          var lvlCell=pp==null?'<span style="color:var(--ink-muted)">—</span>':'<span class="lvl '+(pp?'ok':'bad')+'">'+(pp?'ผ่านเกณฑ์':'ไม่ผ่านเกณฑ์')+'</span>';
+          html+='<tr>'+
+            '<td class="name-col" style="font-weight:'+(p.isZone||p.isNation?'700':'500')+'">'+p.name+(p.isZone?' (เขตสุขภาพที่ 7)':'')+'</td>';
+          combo.forEach(function(x,i){
+            var v=provVal(x,p.id);
+            if(v==null){ html+='<td style="color:var(--ink-muted)">—</td>'; return; }
+            var cp=provPass(x,v);
+            var col=cp==null?(i===0?'var(--ink)':'#1A73C8'):(cp?'var(--green-600)':'var(--red-soft)');
+            html+='<td style="text-align:center"><b style="font-family:IBM Plex Sans,sans-serif;font-size:15.5px;color:'+col+'">'+fmt(v)+'</b> <small style="color:var(--ink-muted)">'+esc(x.unit)+'</small></td>';
+          });
+          html+='<td>'+lvlCell+'</td></tr>';
+        });
       } else {
         html+='<div class="tbl-wrap"><table style="min-width:520px">'+
           '<thead><tr>'+
@@ -579,9 +650,12 @@
         '<div class="chart-title"><i data-lucide="bar-chart-3"></i>กราฟผลรายจังหวัด เขตสุขภาพที่ 7</div>'+
         '<div class="chart-scroll" id="chart-area"></div>'+
         '<div class="chart-legend">'+
-          '<span class="cl-leg"><span class="swatch" style="background:#9DB8A8"></span>เขตรวม</span>'+
-          '<span class="cl-leg"><span class="swatch" style="background:#52B97A"></span>ผ่านเกณฑ์</span>'+
-          '<span class="cl-leg"><span class="swatch" style="background:#D99A90"></span>ไม่ผ่านเกณฑ์</span>'+
+          (related.length?
+            '<span class="cl-leg"><span class="swatch" style="background:#52B97A"></span>ร้อยละโลหิตจาง</span>'+
+            '<span class="cl-leg"><span class="swatch" style="background:#7FA8D9"></span>ไม่พบรหัส ICD10</span>':
+            '<span class="cl-leg"><span class="swatch" style="background:#9DB8A8"></span>เขตรวม</span>'+
+            '<span class="cl-leg"><span class="swatch" style="background:#52B97A"></span>ผ่านเกณฑ์</span>'+
+            '<span class="cl-leg"><span class="swatch" style="background:#D99A90"></span>ไม่ผ่านเกณฑ์</span>')+
         '</div></div>';
 
       rp.innerHTML=html;
@@ -641,11 +715,20 @@
     // ── SVG bar chart ──
     function buildChart(d, container){
       if(!d||!container){if(container)container.innerHTML='';return;}
+      d=primaryIndicator(d);
+      var bundle=[d].concat(relatedIndicators(d));
       var cols=areasForIndicator(d);
       var pValues=cols.map(function(p){var v=provVal(d,p.id);return v==null?0:v;});
       var ht=hasTarget(d);
       var tv=termVals(d);
-      var allVals=pValues.slice();
+      var bundleChart=bundle.length>1 && !tv.has;
+      var allVals=bundleChart?[]:pValues.slice();
+      if(bundleChart) cols.forEach(function(p){
+        bundle.forEach(function(x){
+          var bv=baseProvVal(x,p.id);
+          if(bv!=null) allVals.push(bv);
+        });
+      });
       if(tv.has) cols.forEach(function(p){ tv.keys.forEach(function(k){ if(tv.vals[k][p.id]!=null) allVals.push(tv.vals[k][p.id]); }); });
       var maxV=Math.max.apply(null,allVals.concat(ht?[d.target]:[]))*1.2||1;
       var n=cols.length;
@@ -782,6 +865,33 @@
           svg.appendChild(T(x+BAR/2,y0+18,nm,{'text-anchor':'middle','font-size':'12','fill':'#46544B'}));
         });
         }
+      } else if(bundleChart){
+      var metricColors=['#52B97A','#7FA8D9','#D8A652'];
+      var lxM=W-RPAD-280;
+      bundle.forEach(function(x,idx){
+        svg.appendChild(R(lxM+idx*128,TOP-28,12,12,metricColors[idx%metricColors.length],3));
+        svg.appendChild(T(lxM+idx*128+17,TOP-18,shortIndicatorName(x),{'font-size':'11','fill':'#46544B'}));
+      });
+      cols.forEach(function(p,i){
+        var x0=LPAD+i*(BAR+GAP)+GAP/2, y0=TOP+plotH;
+        var bw=(BAR-6*(bundle.length-1))/bundle.length;
+        var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
+        var bundleLines=bundle.map(function(x){
+          var mv=baseProvVal(x,p.id);
+          return shortIndicatorName(x)+': '+(mv==null?'ไม่มีข้อมูล':fmt(mv)+' '+(x.unit||''));
+        });
+        bundle.forEach(function(x,idx){
+          var v=baseProvVal(x,p.id);
+          if(v==null) return;
+          var bH=Math.max(v/maxV*plotH,2);
+          var bx=x0+idx*(bw+6);
+          var col=metricColors[idx%metricColors.length];
+          var bar=R(bx,y0-bH,bw,bH,col,4);
+          attachTip(bar,nm,v,shortIndicatorName(x),col,bundleLines);
+          svg.appendChild(bar);
+        });
+        svg.appendChild(T(x0+BAR/2,y0+18,nm,{'text-anchor':'middle','font-size':'12','fill':'#46544B'}));
+      });
       } else {
       cols.forEach(function(p,i){
         var v=pValues[i];
