@@ -659,6 +659,49 @@
       function R(x,y,w,h,fill,rx){var e=document.createElementNS(ns,'rect');[['x',x],['y',y],['width',w],['height',h],['fill',fill],['rx',rx||5]].forEach(function(p){e.setAttribute(p[0],p[1]);});return e;}
       function T(x,y,txt,at){var e=document.createElementNS(ns,'text');e.setAttribute('x',x);e.setAttribute('y',y);if(at)Object.keys(at).forEach(function(k){e.setAttribute(k,at[k]);});e.textContent=txt;return e;}
       function L(x1,y1,x2,y2,at){var e=document.createElementNS(ns,'line');[['x1',x1],['y1',y1],['x2',x2],['y2',y2]].forEach(function(p){e.setAttribute(p[0],p[1]);});if(at)Object.keys(at).forEach(function(k){e.setAttribute(k,at[k]);});return e;}
+      var tipG=document.createElementNS(ns,'g');
+      tipG.setAttribute('visibility','hidden');
+      tipG.setAttribute('pointer-events','none');
+      var tipBg=R(0,0,136,52,'#19231D',9);
+      var tipAccent=R(0,0,4,52,'#52B97A',3);
+      var tipTitle=T(14,20,'',{'font-size':'12','fill':'#FFFFFF','font-weight':'700'});
+      var tipValue=T(14,39,'',{'font-size':'11','fill':'#DDE8E0','font-weight':'500'});
+      tipG.appendChild(tipBg); tipG.appendChild(tipAccent); tipG.appendChild(tipTitle); tipG.appendChild(tipValue);
+      function setTipPos(pt){
+        var tw=Number(tipBg.getAttribute('width'))||136, th=52;
+        var tx=pt.x+14, ty=pt.y-th-14;
+        if(tx+tw>W-8) tx=pt.x-tw-14;
+        if(ty<TOP-38) ty=pt.y+16;
+        tipG.setAttribute('transform','translate('+tx+','+ty+')');
+      }
+      function svgPoint(evt){
+        var pt=svg.createSVGPoint();
+        pt.x=evt.clientX; pt.y=evt.clientY;
+        return pt.matrixTransform(svg.getScreenCTM().inverse());
+      }
+      function showTip(evt,label,value,period,color){
+        tipTitle.textContent=label;
+        tipValue.textContent=(period?period+' · ':'')+fmt(value)+' '+(d.unit||'');
+        tipAccent.setAttribute('fill',color||'#52B97A');
+        tipG.setAttribute('visibility','visible');
+        var tw=Math.max(136, Math.max(tipTitle.getComputedTextLength(), tipValue.getComputedTextLength())+28);
+        tipBg.setAttribute('width',tw); tipAccent.setAttribute('height',52);
+        setTipPos(svgPoint(evt));
+      }
+      function hideTip(){ tipG.setAttribute('visibility','hidden'); }
+      function attachTip(bar,label,value,period,color){
+        bar.style.cursor='pointer';
+        bar.setAttribute('tabindex','0');
+        bar.setAttribute('aria-label',label+' '+(period?period+' ':'')+fmt(value)+' '+(d.unit||''));
+        var title=document.createElementNS(ns,'title');
+        title.textContent=label+' '+(period?period+' ':'')+fmt(value)+' '+(d.unit||'');
+        bar.appendChild(title);
+        bar.addEventListener('mouseenter',function(e){bar.setAttribute('opacity','.88');showTip(e,label,value,period,color);});
+        bar.addEventListener('mousemove',function(e){setTipPos(svgPoint(e));});
+        bar.addEventListener('mouseleave',function(){bar.removeAttribute('opacity');hideTip();});
+        bar.addEventListener('focus',function(){bar.setAttribute('opacity','.88');});
+        bar.addEventListener('blur',function(){bar.removeAttribute('opacity');hideTip();});
+      }
       for(var gi=0;gi<=5;gi++){
         var gv=maxV*gi/5,gy=TOP+plotH-gv/maxV*plotH;
         svg.appendChild(L(LPAD,gy,W-RPAD,gy,{'stroke':'#EEF2ED','stroke-width':'1'}));
@@ -687,8 +730,10 @@
             if(v==null) return;
             var bH=Math.max(v/maxV*plotH,2);
             var bx=x+idx*(bw+4);
-            svg.appendChild(R(bx,y0-bH,bw,bH,qColors[idx],4));
-            svg.appendChild(T(bx+bw/2,y0-bH-6,fmt(v),{'text-anchor':'middle','font-size':'9.5','fill':'#46544B','font-weight':'700'}));
+            var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
+            var bar=R(bx,y0-bH,bw,bH,qColors[idx],4);
+            attachTip(bar,nm,v,'ไตรมาส '+k,qColors[idx]);
+            svg.appendChild(bar);
           });
           var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
           svg.appendChild(T(x+BAR/2,y0+18,nm,{'text-anchor':'middle','font-size':'12','fill':'#46544B'}));
@@ -706,8 +751,11 @@
           pairs.forEach(function(q){
             if(q.v==null) return;
             var bH=Math.max(q.v/maxV*plotH,2);
-            svg.appendChild(R(x+q.dx,y0-bH,bw,bH,q.col,4));
-            svg.appendChild(T(x+q.dx+bw/2,y0-bH-6,fmt(q.v),{'text-anchor':'middle','font-size':'10.5','fill':'#46544B','font-weight':'700'}));
+            var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
+            var period=q.dx===0?'เทอม 2 (ธ.ค.–ก.พ.)':'เทอม 1 (พ.ค.–ก.ค.)';
+            var bar=R(x+q.dx,y0-bH,bw,bH,q.col,4);
+            attachTip(bar,nm,q.v,period,q.col);
+            svg.appendChild(bar);
           });
           var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
           svg.appendChild(T(x+BAR/2,y0+18,nm,{'text-anchor':'middle','font-size':'12','fill':'#46544B'}));
@@ -722,13 +770,14 @@
         var pp=!ht?null:(d.dir==='≥'?(v/d.target*100>=100):(v?d.target/v*100>=100:false));
         var col=p.isNation?'#7FA8D9':(p.isZone?'#9DB8A8':(pp==null?'#8FB39C':(pp?'#52B97A':'#D99A90')));
         var txtCol=(p.isZone||p.isNation)?'#46544B':(pp==null?'#46544B':(pp?'#1C7A4C':'#B95E52'));
-        svg.appendChild(R(x,y0-bH,BAR,bH,col,5));
-        svg.appendChild(T(x+BAR/2,y0-bH-8,fmt(v),{'text-anchor':'middle','font-size':'12.5','fill':txtCol,'font-weight':'700'}));
         var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
+        var bar=R(x,y0-bH,BAR,bH,col,5);
+        attachTip(bar,nm,v,null,col);
+        svg.appendChild(bar);
         svg.appendChild(T(x+BAR/2,y0+18,nm,{'text-anchor':'middle','font-size':'12','fill':'#46544B'}));
-        svg.appendChild(T(x+BAR/2,y0+34,fmt(v)+' '+d.unit,{'text-anchor':'middle','font-size':'10','fill':txtCol,'font-weight':'600'}));
       });
       }
+      svg.appendChild(tipG);
       container.innerHTML='';
       container.appendChild(svg);
     }
