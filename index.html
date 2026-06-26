@@ -667,8 +667,12 @@
       var tipTitle=T(14,20,'',{'font-size':'12','fill':'#FFFFFF','font-weight':'700'});
       var tipValue=T(14,39,'',{'font-size':'11','fill':'#DDE8E0','font-weight':'500'});
       tipG.appendChild(tipBg); tipG.appendChild(tipAccent); tipG.appendChild(tipTitle); tipG.appendChild(tipValue);
+      var tipExtra=[];
+      function clearTipExtra(){
+        while(tipExtra.length) tipG.removeChild(tipExtra.pop());
+      }
       function setTipPos(pt){
-        var tw=Number(tipBg.getAttribute('width'))||136, th=52;
+        var tw=Number(tipBg.getAttribute('width'))||136, th=Number(tipBg.getAttribute('height'))||52;
         var tx=pt.x+14, ty=pt.y-th-14;
         if(tx+tw>W-8) tx=pt.x-tw-14;
         if(ty<TOP-38) ty=pt.y+16;
@@ -679,24 +683,35 @@
         pt.x=evt.clientX; pt.y=evt.clientY;
         return pt.matrixTransform(svg.getScreenCTM().inverse());
       }
-      function showTip(evt,label,value,period,color){
+      function showTip(evt,label,value,period,color,lines){
+        clearTipExtra();
+        var details=(lines&&lines.length)?lines:[(period?period+' · ':'')+fmt(value)+' '+(d.unit||'')];
         tipTitle.textContent=label;
-        tipValue.textContent=(period?period+' · ':'')+fmt(value)+' '+(d.unit||'');
+        tipValue.textContent=details[0]||'';
+        details.slice(1).forEach(function(line,i){
+          var tx=T(14,55+(i*16),line,{'font-size':'11','fill':'#DDE8E0','font-weight':'500'});
+          tipExtra.push(tx);
+          tipG.appendChild(tx);
+        });
         tipAccent.setAttribute('fill',color||'#52B97A');
         tipG.setAttribute('visibility','visible');
-        var tw=Math.max(136, Math.max(tipTitle.getComputedTextLength(), tipValue.getComputedTextLength())+28);
-        tipBg.setAttribute('width',tw); tipAccent.setAttribute('height',52);
+        var longest=Math.max.apply(null,[tipTitle.getComputedTextLength(),tipValue.getComputedTextLength()].concat(tipExtra.map(function(t){return t.getComputedTextLength();})));
+        var tw=Math.max(150,longest+28);
+        var th=Math.max(52,38+(details.length*16));
+        tipBg.setAttribute('width',tw); tipBg.setAttribute('height',th); tipAccent.setAttribute('height',th);
         setTipPos(svgPoint(evt));
       }
       function hideTip(){ tipG.setAttribute('visibility','hidden'); }
-      function attachTip(bar,label,value,period,color){
+      function attachTip(bar,label,value,period,color,lines){
+        var details=(lines&&lines.length)?lines:[(period?period+' ':'')+fmt(value)+' '+(d.unit||'')];
+        var tipText=label+' '+details.join(' | ');
         bar.style.cursor='pointer';
         bar.setAttribute('tabindex','0');
-        bar.setAttribute('aria-label',label+' '+(period?period+' ':'')+fmt(value)+' '+(d.unit||''));
+        bar.setAttribute('aria-label',tipText);
         var title=document.createElementNS(ns,'title');
-        title.textContent=label+' '+(period?period+' ':'')+fmt(value)+' '+(d.unit||'');
+        title.textContent=tipText;
         bar.appendChild(title);
-        bar.addEventListener('mouseenter',function(e){bar.setAttribute('opacity','.88');showTip(e,label,value,period,color);});
+        bar.addEventListener('mouseenter',function(e){bar.setAttribute('opacity','.88');showTip(e,label,value,period,color,lines);});
         bar.addEventListener('mousemove',function(e){setTipPos(svgPoint(e));});
         bar.addEventListener('mouseleave',function(){bar.removeAttribute('opacity');hideTip();});
         bar.addEventListener('focus',function(){bar.setAttribute('opacity','.88');});
@@ -725,17 +740,20 @@
         });
         cols.forEach(function(p,i){
           var x=LPAD+i*(BAR+GAP)+GAP/2, y0=TOP+plotH, bw=(BAR-12)/4;
+          var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
+          var qLines=tv.keys.map(function(qk){
+            var qv=tv.vals[qk][p.id];
+            return 'ไตรมาส '+qk+': '+(qv==null?'ไม่มีข้อมูล':fmt(qv)+' '+(d.unit||''));
+          });
           tv.keys.forEach(function(k,idx){
             var v=tv.vals[k][p.id];
             if(v==null) return;
             var bH=Math.max(v/maxV*plotH,2);
             var bx=x+idx*(bw+4);
-            var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
             var bar=R(bx,y0-bH,bw,bH,qColors[idx],4);
-            attachTip(bar,nm,v,'ไตรมาส '+k,qColors[idx]);
+            attachTip(bar,nm,v,'ไตรมาส '+k,qColors[idx],qLines);
             svg.appendChild(bar);
           });
-          var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
           svg.appendChild(T(x+BAR/2,y0+18,nm,{'text-anchor':'middle','font-size':'12','fill':'#46544B'}));
         });
         } else {
@@ -748,16 +766,19 @@
         cols.forEach(function(p,i){
           var x=LPAD+i*(BAR+GAP)+GAP/2, y0=TOP+plotH, bw=(BAR-6)/2;
           var pairs=[{v:tv.t2[p.id],col:'#52B97A',dx:0},{v:tv.t1[p.id],col:'#7FA8D9',dx:bw+6}];
+          var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
+          var termLines=[
+            'เทอม 2 (ธ.ค.–ก.พ.): '+(tv.t2[p.id]==null?'ไม่มีข้อมูล':fmt(tv.t2[p.id])+' '+(d.unit||'')),
+            'เทอม 1 (พ.ค.–ก.ค.): '+(tv.t1[p.id]==null?'ไม่มีข้อมูล':fmt(tv.t1[p.id])+' '+(d.unit||''))
+          ];
           pairs.forEach(function(q){
             if(q.v==null) return;
             var bH=Math.max(q.v/maxV*plotH,2);
-            var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
             var period=q.dx===0?'เทอม 2 (ธ.ค.–ก.พ.)':'เทอม 1 (พ.ค.–ก.ค.)';
             var bar=R(x+q.dx,y0-bH,bw,bH,q.col,4);
-            attachTip(bar,nm,q.v,period,q.col);
+            attachTip(bar,nm,q.v,period,q.col,termLines);
             svg.appendChild(bar);
           });
-          var nm=p.isNation?'ประเทศ':(p.isZone?'เขตที่ 7':p.name);
           svg.appendChild(T(x+BAR/2,y0+18,nm,{'text-anchor':'middle','font-size':'12','fill':'#46544B'}));
         });
         }
