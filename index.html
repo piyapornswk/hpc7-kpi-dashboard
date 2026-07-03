@@ -191,7 +191,7 @@
       </div>
       <div class="filter-item">
         <label>ตัวชี้วัด (สำหรับกราฟ)</label>
-        <select class="fsel full" id="sel-indicator"><option value="">— ตัวแรกของกลุ่ม —</option></select>
+        <select class="fsel full" id="sel-indicator"><option value="">ทั้งหมด</option></select>
       </div>
       <div class="filter-item">
         <label>ปีงบประมาณ</label>
@@ -379,7 +379,7 @@
     }
 
     function fillIndicators(gid){
-      si.innerHTML='<option value="">— ตัวแรกของกลุ่ม —</option>';
+      si.innerHTML='<option value="">ทั้งหมด</option>';
       visibleGroupItems(gid).forEach(function(d){
         var o=document.createElement('option'); o.value=d.id; o.textContent=d.name;
         si.appendChild(o);
