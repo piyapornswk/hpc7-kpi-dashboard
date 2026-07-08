@@ -1,4 +1,4 @@
-name = "hpc7-kpi-dashboard"
+name = "hpc7-kpi-dashboard-healthregion7"
 compatibility_date = "2025-06-01"
 
 # เว็บ static ล้วน (ไม่มีโค้ด Worker) — เสิร์ฟไฟล์ในโฟลเดอร์นี้เป็นเว็บไซต์
